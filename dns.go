@@ -41,23 +41,26 @@ type Options struct {
 	ListenAddress string
 	PublicIP      string
 	RootDomain    string
-	Storage       Storage
 }
 
 type DNS struct {
-	logger          *zerolog.Logger
-	options         *Options
-	server          *dns.Server
-	parsedPublicIP  net.IP
-	parsedDNSRoot   string
+	logger  *zerolog.Logger
+	options *Options
+	storage Storage
+
+	server         *dns.Server
+	parsedPublicIP net.IP
+	parsedDNSRoot  string
+
 	dnsChallengesMu sync.RWMutex
 	dnsChallenges   map[string]string
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
-func New(options *Options, logger *zerolog.Logger) (*DNS, error) {
+func New(options *Options, storage Storage, logger *zerolog.Logger) (*DNS, error) {
 	l := logger.With().Str(options.LogName, "DNS").Logger()
 
 	parsedPublicIP := net.ParseIP(options.PublicIP)
@@ -70,6 +73,7 @@ func New(options *Options, logger *zerolog.Logger) (*DNS, error) {
 	return &DNS{
 		logger:         &l,
 		options:        options,
+		storage:        storage,
 		parsedPublicIP: parsedPublicIP,
 		parsedDNSRoot:  parsedDNSRoot,
 		dnsChallenges:  make(map[string]string),
@@ -79,11 +83,11 @@ func New(options *Options, logger *zerolog.Logger) (*DNS, error) {
 func (d *DNS) Start() error {
 	d.ctx, d.cancel = context.WithCancel(context.Background())
 	d.dnsChallengesMu.Lock()
-	dnsChallengeEvents := d.options.Storage.SubscribeToDNSChallenges(d.ctx)
+	dnsChallengeEvents := d.storage.SubscribeToDNSChallenges(d.ctx)
 	d.wg.Add(1)
 	go d.subscribeToChallengeEvents(dnsChallengeEvents)
 	d.logger.Info().Msg("subscribed to dns challenges events")
-	dnsChallenges, err := d.options.Storage.ListDNSChallenges(d.ctx)
+	dnsChallenges, err := d.storage.ListDNSChallenges(d.ctx)
 	if err != nil {
 		d.dnsChallengesMu.Unlock()
 		return fmt.Errorf("failed to list dns challenges: %w", err)

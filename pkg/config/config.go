@@ -80,12 +80,11 @@ func (c *Config) GlobalRequiredFlags(cmd *cobra.Command) error {
 	return nil
 }
 
-func (c *Config) GenerateOptions(logName string, storage dns.Storage) *dns.Options {
+func (c *Config) GenerateOptions(logName string) *dns.Options {
 	return &dns.Options{
 		LogName:       logName,
 		ListenAddress: c.ListenAddress,
 		PublicIP:      c.PublicIP,
 		RootDomain:    c.RootDomain,
-		Storage:       storage,
 	}
 }
