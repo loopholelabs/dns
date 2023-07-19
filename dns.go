@@ -29,6 +29,7 @@ import (
 )
 
 var (
+	ErrDisabled        = errors.New("dns is disabled")
 	ErrInvalidPublicIP = errors.New("invalid public ip")
 )
 
@@ -38,6 +39,7 @@ const (
 
 type Options struct {
 	LogName       string
+	Disabled      bool
 	ListenAddress string
 	PublicIP      string
 	RootDomain    string
@@ -62,6 +64,10 @@ type DNS struct {
 
 func New(options *Options, storage Storage, logger *zerolog.Logger) (*DNS, error) {
 	l := logger.With().Str(options.LogName, "DNS").Logger()
+	if options.Disabled {
+		l.Warn().Msg("disabled")
+		return nil, ErrDisabled
+	}
 
 	parsedPublicIP := net.ParseIP(options.PublicIP)
 	if parsedPublicIP == nil {

@@ -19,7 +19,6 @@ package config
 import (
 	"errors"
 	"github.com/loopholelabs/dns"
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -29,60 +28,52 @@ var (
 	ErrRootDomainRequired    = errors.New("root domain is required")
 )
 
+const (
+	DefaultDisabled = false
+)
+
 type Config struct {
+	Disabled      bool   `yaml:"disabled"`
 	ListenAddress string `yaml:"listen_address"`
 	PublicIP      string `yaml:"public_ip"`
 	RootDomain    string `yaml:"root_domain"`
 }
 
 func New() *Config {
-	return &Config{}
+	return &Config{
+		Disabled: DefaultDisabled,
+	}
 }
 
 func (c *Config) Validate() error {
-	if c.ListenAddress == "" {
-		return ErrListenAddressRequired
-	}
+	if !c.Disabled {
+		if c.ListenAddress == "" {
+			return ErrListenAddressRequired
+		}
 
-	if c.PublicIP == "" {
-		return ErrPublicIPRequired
-	}
+		if c.PublicIP == "" {
+			return ErrPublicIPRequired
+		}
 
-	if c.RootDomain == "" {
-		return ErrRootDomainRequired
+		if c.RootDomain == "" {
+			return ErrRootDomainRequired
+		}
 	}
 
 	return nil
 }
 
 func (c *Config) RootPersistentFlags(flags *pflag.FlagSet) {
+	flags.BoolVar(&c.Disabled, "dns-disabled", DefaultDisabled, "Disable dns")
 	flags.StringVar(&c.ListenAddress, "dns-listen-address", "", "The listen address for the dns service")
 	flags.StringVar(&c.PublicIP, "dns-public-ip", "", "The public ip for the dns service")
 	flags.StringVar(&c.RootDomain, "dns-root-domain", "", "The root domain for the dns service")
 }
 
-func (c *Config) GlobalRequiredFlags(cmd *cobra.Command) error {
-	err := cmd.MarkFlagRequired("dns-listen-address")
-	if err != nil {
-		return err
-	}
-
-	err = cmd.MarkFlagRequired("dns-public-ip")
-	if err != nil {
-		return err
-	}
-
-	err = cmd.MarkFlagRequired("dns-root-domain")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (c *Config) GenerateOptions(logName string) *dns.Options {
 	return &dns.Options{
 		LogName:       logName,
+		Disabled:      c.Disabled,
 		ListenAddress: c.ListenAddress,
 		PublicIP:      c.PublicIP,
 		RootDomain:    c.RootDomain,
