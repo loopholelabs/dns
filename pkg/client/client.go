@@ -58,7 +58,7 @@ func New(options *dns.Options, logger *zerolog.Logger) (*Client, error) {
 func (c *Client) LookupCNAME(domain string) ([]string, error) {
 	dnsRequest := new(dnsClient.Msg)
 	dnsRequest.SetQuestion(FQDN(domain), dnsClient.TypeCNAME)
-	dnsRequest.RecursionDesired = false
+	dnsRequest.RecursionDesired = true
 	dnsRequest.SetEdns0(4096, true)
 	var cnames []string
 	for _, nameserver := range nameservers {
