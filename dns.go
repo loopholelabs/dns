@@ -38,11 +38,12 @@ const (
 )
 
 type Options struct {
-	LogName       string
-	Disabled      bool
-	ListenAddress string
-	PublicIP      string
-	RootDomain    string
+	LogName         string
+	Disabled        bool
+	ListenAddress   string
+	PublicIP        string
+	RootDomain      string
+	CNAMERootDomain string
 }
 
 type DNS struct {
@@ -50,9 +51,10 @@ type DNS struct {
 	options *Options
 	storage Storage
 
-	server         *dns.Server
-	parsedPublicIP net.IP
-	parsedDNSRoot  string
+	server                *dns.Server
+	parsedPublicIP        net.IP
+	parsedRootDomain      string
+	parsedCNAMERootDomain string
 
 	dnsChallengesMu sync.RWMutex
 	dnsChallenges   map[string]string
@@ -74,15 +76,17 @@ func New(options *Options, storage Storage, logger *zerolog.Logger) (*DNS, error
 		return nil, ErrInvalidPublicIP
 	}
 
-	parsedDNSRoot := dns.Fqdn(strings.ToLower(options.RootDomain))
+	parsedRootDomain := dns.Fqdn(strings.ToLower(options.RootDomain))
+	parsedCNAMERootDomain := dns.Fqdn(strings.ToLower(options.CNAMERootDomain))
 
 	return &DNS{
-		logger:         &l,
-		options:        options,
-		storage:        storage,
-		parsedPublicIP: parsedPublicIP,
-		parsedDNSRoot:  parsedDNSRoot,
-		dnsChallenges:  make(map[string]string),
+		logger:                &l,
+		options:               options,
+		storage:               storage,
+		parsedPublicIP:        parsedPublicIP,
+		parsedRootDomain:      parsedRootDomain,
+		parsedCNAMERootDomain: parsedCNAMERootDomain,
+		dnsChallenges:         make(map[string]string),
 	}, nil
 }
 
@@ -130,28 +134,28 @@ func (d *DNS) Stop() error {
 }
 
 func (d *DNS) ValidTXTRecordQuestion(domain string) (bool, string) {
-	if qualifiers := strings.SplitN(domain, ".", 2); len(qualifiers) == 2 && qualifiers[1] == d.parsedDNSRoot {
+	if qualifiers := strings.SplitN(domain, ".", 2); len(qualifiers) == 2 && qualifiers[1] == d.parsedRootDomain {
 		return true, qualifiers[0]
 	}
 	return false, ""
 }
 
 func (d *DNS) ValidARecordQuestion(domain string) bool {
-	if len(domain) >= len(d.parsedDNSRoot) && domain[len(domain)-len(d.parsedDNSRoot):] == d.parsedDNSRoot {
+	if len(domain) >= len(d.parsedRootDomain) && domain[len(domain)-len(d.parsedRootDomain):] == d.parsedRootDomain {
 		return true
 	}
 	return false
 }
 
 func (d *DNS) ValidNSRecordQuestion(domain string) bool {
-	if len(domain) >= len(d.parsedDNSRoot) && domain[len(domain)-len(d.parsedDNSRoot):] == d.parsedDNSRoot {
+	if len(domain) >= len(d.parsedRootDomain) && domain[len(domain)-len(d.parsedRootDomain):] == d.parsedRootDomain {
 		return true
 	}
 	return false
 }
 
 func (d *DNS) ValidSOARecordQuestion(domain string) bool {
-	if len(domain) >= len(d.parsedDNSRoot) && domain[len(domain)-len(d.parsedDNSRoot):] == d.parsedDNSRoot {
+	if len(domain) >= len(d.parsedRootDomain) && domain[len(domain)-len(d.parsedRootDomain):] == d.parsedRootDomain {
 		return true
 	}
 	return false
@@ -199,8 +203,8 @@ func (d *DNS) handle(w dns.ResponseWriter, r *dns.Msg) {
 			case dns.TypeNS:
 				if d.ValidNSRecordQuestion(question.Name) {
 					nsRecord := utils.DefaultNSRecord(question.Name)
-					nsRecord.Ns = d.parsedDNSRoot
-					d.logger.Debug().Msgf("received NS query for valid domain '%s' (ID %d), responding with '%s'", question.Name, r.Id, d.parsedDNSRoot)
+					nsRecord.Ns = d.parsedRootDomain
+					d.logger.Debug().Msgf("received NS query for valid domain '%s' (ID %d), responding with '%s'", question.Name, r.Id, d.parsedRootDomain)
 					m.Answer = append(m.Answer, nsRecord)
 				} else {
 					d.logger.Warn().Msgf("received NS query for invalid domain '%s' (ID %d)", question.Name, r.Id)
@@ -208,8 +212,8 @@ func (d *DNS) handle(w dns.ResponseWriter, r *dns.Msg) {
 			case dns.TypeSOA:
 				if d.ValidSOARecordQuestion(question.Name) {
 					soaRecord := utils.DefaultSOARecord(question.Name)
-					soaRecord.Ns = d.parsedDNSRoot
-					soaRecord.Mbox = Mbox + d.parsedDNSRoot
+					soaRecord.Ns = d.parsedRootDomain
+					soaRecord.Mbox = Mbox + d.parsedRootDomain
 					d.logger.Debug().Msgf("received SOA query for valid domain '%s' (ID %d), responding with NS '%s', Serial %d, and Mbox '%s'", question.Name, r.Id, soaRecord.Ns, soaRecord.Serial, soaRecord.Mbox)
 					m.Answer = append(m.Answer, soaRecord)
 				} else {

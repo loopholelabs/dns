@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	ErrListenAddressRequired = errors.New("listen address is required")
-	ErrPublicIPRequired      = errors.New("public ip is required")
-	ErrRootDomainRequired    = errors.New("root domain is required")
+	ErrListenAddressRequired   = errors.New("listen address is required")
+	ErrPublicIPRequired        = errors.New("public ip is required")
+	ErrRootDomainRequired      = errors.New("root domain is required")
+	ErrCNAMERootDomainRequired = errors.New("cname root domain is required")
 )
 
 const (
@@ -33,10 +34,11 @@ const (
 )
 
 type Config struct {
-	Disabled      bool   `yaml:"disabled"`
-	ListenAddress string `yaml:"listen_address"`
-	PublicIP      string `yaml:"public_ip"`
-	RootDomain    string `yaml:"root_domain"`
+	Disabled        bool   `yaml:"disabled"`
+	ListenAddress   string `yaml:"listen_address"`
+	PublicIP        string `yaml:"public_ip"`
+	RootDomain      string `yaml:"root_domain"`
+	CNAMERootDomain string `yaml:"cname_root_domain"`
 }
 
 func New() *Config {
@@ -58,6 +60,10 @@ func (c *Config) Validate() error {
 		if c.RootDomain == "" {
 			return ErrRootDomainRequired
 		}
+
+		if c.CNAMERootDomain == "" {
+			return ErrCNAMERootDomainRequired
+		}
 	}
 
 	return nil
@@ -68,14 +74,16 @@ func (c *Config) RootPersistentFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.ListenAddress, "dns-listen-address", "", "The listen address for the dns service")
 	flags.StringVar(&c.PublicIP, "dns-public-ip", "", "The public ip for the dns service")
 	flags.StringVar(&c.RootDomain, "dns-root-domain", "", "The root domain for the dns service")
+	flags.StringVar(&c.CNAMERootDomain, "dns-cname-root-domain", "", "The cname root domain for the dns service")
 }
 
 func (c *Config) GenerateOptions(logName string) *dns.Options {
 	return &dns.Options{
-		LogName:       logName,
-		Disabled:      c.Disabled,
-		ListenAddress: c.ListenAddress,
-		PublicIP:      c.PublicIP,
-		RootDomain:    c.RootDomain,
+		LogName:         logName,
+		Disabled:        c.Disabled,
+		ListenAddress:   c.ListenAddress,
+		PublicIP:        c.PublicIP,
+		RootDomain:      c.RootDomain,
+		CNAMERootDomain: c.CNAMERootDomain,
 	}
 }

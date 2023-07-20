@@ -20,6 +20,8 @@ import (
 	"github.com/loopholelabs/dns"
 	dnsClient "github.com/miekg/dns"
 	"github.com/rs/zerolog"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -37,6 +39,10 @@ type Client struct {
 	options *dns.Options
 
 	client *dnsClient.Client
+
+	parsedPublicIP        net.IP
+	parsedRootDomain      string
+	parsedCNAMERootDomain string
 }
 
 func New(options *dns.Options, logger *zerolog.Logger) (*Client, error) {
@@ -46,18 +52,28 @@ func New(options *dns.Options, logger *zerolog.Logger) (*Client, error) {
 		return nil, dns.ErrDisabled
 	}
 
-	return &Client{
+	c := &Client{
 		logger:  &l,
 		options: options,
 		client: &dnsClient.Client{
 			Timeout: time.Second * 5,
 		},
-	}, nil
+	}
+
+	c.parsedPublicIP = net.ParseIP(options.PublicIP)
+	if c.parsedPublicIP == nil {
+		return nil, dns.ErrInvalidPublicIP
+	}
+
+	c.parsedRootDomain = c.FQDN(strings.ToLower(options.RootDomain))
+	c.parsedCNAMERootDomain = c.FQDN(strings.ToLower(options.CNAMERootDomain))
+
+	return c, nil
 }
 
 func (c *Client) LookupCNAME(domain string) ([]string, error) {
 	dnsRequest := new(dnsClient.Msg)
-	dnsRequest.SetQuestion(FQDN(domain), dnsClient.TypeCNAME)
+	dnsRequest.SetQuestion(c.FQDN(domain), dnsClient.TypeCNAME)
 	dnsRequest.RecursionDesired = true
 	dnsRequest.SetEdns0(4096, true)
 	var cnames []string
@@ -87,7 +103,7 @@ func (c *Client) LookupCNAME(domain string) ([]string, error) {
 
 func (c *Client) LookupTXT(domain string) ([]string, error) {
 	dnsRequest := new(dnsClient.Msg)
-	dnsRequest.SetQuestion(FQDN(domain), dnsClient.TypeTXT)
+	dnsRequest.SetQuestion(c.FQDN(domain), dnsClient.TypeTXT)
 	dnsRequest.RecursionDesired = true
 	dnsRequest.SetEdns0(4096, true)
 	var txts []string
@@ -115,14 +131,18 @@ func (c *Client) LookupTXT(domain string) ([]string, error) {
 	return txts, nil
 }
 
-func (c *Client) RootDomain() string {
-	return c.options.RootDomain
-}
-
 func (c *Client) PublicIP() string {
-	return c.options.PublicIP
+	return c.parsedPublicIP.String()
 }
 
-func FQDN(domain string) string {
+func (c *Client) CNAMERootDomain() string {
+	return c.parsedCNAMERootDomain
+}
+
+func (c *Client) RootDomain() string {
+	return c.parsedRootDomain
+}
+
+func (c *Client) FQDN(domain string) string {
 	return dnsClient.Fqdn(domain)
 }
