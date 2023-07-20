@@ -143,6 +143,10 @@ func (c *Client) RootDomain() string {
 	return c.parsedRootDomain
 }
 
+func (c *Client) Nameservers() []string {
+	return nameservers
+}
+
 func (c *Client) FQDN(domain string) string {
 	return dnsClient.Fqdn(domain)
 }
