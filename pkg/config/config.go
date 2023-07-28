@@ -34,11 +34,11 @@ const (
 )
 
 type Config struct {
-	Disabled        bool   `yaml:"disabled"`
-	ListenAddress   string `yaml:"listen_address"`
-	PublicIP        string `yaml:"public_ip"`
-	RootDomain      string `yaml:"root_domain"`
-	CNAMERootDomain string `yaml:"cname_root_domain"`
+	Disabled        bool   `mapstructure:"disabled"`
+	ListenAddress   string `mapstructure:"listen_address"`
+	PublicIP        string `mapstructure:"public_ip"`
+	RootDomain      string `mapstructure:"root_domain"`
+	CNAMERootDomain string `mapstructure:"cname_root_domain"`
 }
 
 func New() *Config {
